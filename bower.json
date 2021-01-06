@@ -1,0 +1,19 @@
+{
+	"name": "adapt-adaptiveContent",
+	"version": "0.1.0",
+	"repository": {
+    "type": "git",
+    "url": "git://github.com/cgkineo/adapt-adaptiveContent"
+  },
+	"framework": ">=5.5",
+	"displayName": "Adaptive Content",
+	"extension": "adaptiveContent",
+	"description": "An extension that allows content objects and final assessments to be hidden based on the learner's performance in an assessment",
+	"main": "/js/adapt-adaptiveContent.js",
+	"keywords": [
+		"adapt-plugin",
+		"adapt-extension"
+	],
+	"license": "GPL-3.0",
+	"targetAttribute": "_adaptiveContent"
+}
