@@ -87,7 +87,7 @@ The following scenarios are all supported by this extension
 The diagnostic assessment functionality is handled entirely by the standard [adapt assessment extension](https://github.com/adaptlearning/adapt-contrib-assessment). However, there are some configuration options that need to be set correctly for it to be able to function as a 'diagnostic assessment'...
 
 The diagnostic assessment **must**:
-* use the adapt-diagnosticResults component to show its results, rather than the standard adapt-contrib-assessmentResults component!
+* use the [adapt-diagnosticResults](https://github.com/cgkineo/adapt-diagnosticResults) component to show its results, rather than the standard adapt-contrib-assessmentResults component!
 * be set to 1 attempt only (set `_attempts` to `1`)
 * have `_isResetOnRevisit` set to `false`
 * have `_includeInTotalScore` set to `false`
