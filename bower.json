@@ -5,7 +5,7 @@
         "url": "git://github.com/cgkineo/adapt-adaptiveContent.git"
     },
     "framework": ">=5.5",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "displayName": "Adaptive Content",
     "extension": "adaptiveContent",
     "description": "An extension that allows content objects and final assessments to be hidden based on the learner's performance in an assessment",
