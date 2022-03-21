@@ -5,6 +5,7 @@ define([
   // TODO need to check this with the language picker to see if it needs any additional work to reset on language change
   Adapt.on('adapt:start', function initAdaptiveContentPlugin() {
     const courseConfig = Adapt.course.get('_adaptiveContent');
+    
     if (!courseConfig || !courseConfig._isEnabled) return;
 
     // check for stored data from a previous attempt
@@ -16,7 +17,7 @@ define([
     }
 
     // restore from suspend data
-    setAsUnavailable(adaptiveContent, false);
+    checkContentStatusSetting(adaptiveContent, false);
 
     if (!courseConfig._finalAssessmentId) return;
 
@@ -60,12 +61,14 @@ define([
    * @param {Backbone.Collection} questions Collection of questionModels
    */
   function checkQuestions(questions) {
+    const statusOption = Adapt.course.get('_adaptiveContent')._setPageStatusAs;
     // first, get a list of blocks (removing duplicates - blocks may have more than one question)
     var blocks = _.uniq(questions.map(question => question.getParent()));
 
     var relatedLearning = createRelatedLearningList(blocks);
     var unavailableRelatedLearning = getUnavailableRelatedLearningList(relatedLearning);
-    setAsUnavailable(unavailableRelatedLearning, true);
+
+    checkContentStatusSetting(unavailableRelatedLearning, true);
   }
 
   /**
@@ -159,7 +162,10 @@ define([
     }
 
     const finalAssessmentPageID = finalAssessment.getState().pageId;
-    setAsUnavailable([finalAssessmentPageID], saveChanges);
+
+    if (Adapt.course.get('_adaptiveContent')._setPageStatusAs === "unavailable") {
+      setAsUnavailable([finalAssessmentPageID], saveChanges);
+    };
 
     Adapt.config.get('_completionCriteria')._requireAssessmentCompleted = false;
   }
@@ -173,6 +179,54 @@ define([
     }
 
     Adapt.offlineStorage.set('score', assessmentState.score, 0, assessmentState.maxScore);
+  }
+
+  function checkContentStatusSetting(arg, boolean) {
+    const statusOption = Adapt.course.get('_adaptiveContent')._setPageStatusAs;
+    switch (statusOption) {
+      case 'unavailable':
+        setAsUnavailable(arg, boolean);
+        break;
+      case 'optional':
+        setAsOptional(arg, boolean);
+        break;
+      case 'complete':
+        setAsComplete(arg, boolean);
+        break;
+    }
+  }
+
+  function setAsOptional(ids, saveChanges = false) {
+    if (!ids || ids.length === 0) return;
+    console.log('setAsOptional', ids, saveChanges);
+    ids.forEach(id => {
+      var model = Adapt.findById(id);
+      if (!model) return;
+
+      model.setOnChildren('_isOptional', true);
+
+      // Sets all affected content with a new class
+      model.set('_classes', model.get('_classes') + " diag-optional");
+    });
+
+    if (saveChanges) saveToOfflineStorage(ids);
+  }
+
+  function setAsComplete(ids, saveChanges = false) {
+    if (!ids || ids.length === 0) return;
+    console.log('setAsComplete', ids, saveChanges);
+    ids.forEach(id => {
+      var model = Adapt.findById(id);
+      if (!model) return;
+
+      model.setOnChildren('_isLocked', false);
+      model.setOnChildren('_isComplete', true);
+
+      // Sets all affected content with a new class
+      model.set('_classes', model.get('_classes') + " diag-complete");
+    });
+
+    if (saveChanges) saveToOfflineStorage(ids);
   }
 
   function setAsUnavailable(ids, saveChanges = false) {
