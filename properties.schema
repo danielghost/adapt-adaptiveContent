@@ -34,6 +34,23 @@
                                     "validators": [],
                                     "help": "Controls whether the score the learner attains in the diagnostic assessment should be sent to the LMS or not. Note that if the course contains a final assessment, and the learner is required to take it, that score will overwrite the score for the diagnostic assessment when they do"
                                 },
+                                "_setPageStatusAs": {
+                                    "type": "string",
+                                    "required": true,
+                                    "default": "unavailable",
+                                    "title": "Set content status as?",
+                                    "enum": ["complete", "optional", "unavailable"],
+                                    "inputType": {
+                                        "type": "Select",
+                                        "options": [
+                                        "complete",
+                                        "optional",
+                                        "unavailable"
+                                        ]
+                                    },
+                                    "validators": [],
+                                    "help": "Sets a status for all adaptive content as complete, optional or unavailable based upon successfully meeting diagnostic criteria."
+                                },
                                 "_diagnosticAssessmentId": {
                                     "type": "string",
                                     "default": "",
