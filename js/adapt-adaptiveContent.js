@@ -5,7 +5,7 @@ define([
   // TODO need to check this with the language picker to see if it needs any additional work to reset on language change
   Adapt.on('adapt:start', function initAdaptiveContentPlugin() {
     const courseConfig = Adapt.course.get('_adaptiveContent');
-    
+
     if (!courseConfig || !courseConfig._isEnabled) return;
 
     // check for stored data from a previous attempt
@@ -61,12 +61,11 @@ define([
    * @param {Backbone.Collection} questions Collection of questionModels
    */
   function checkQuestions(questions) {
-    const statusOption = Adapt.course.get('_adaptiveContent')._setPageStatusAs;
     // first, get a list of blocks (removing duplicates - blocks may have more than one question)
-    var blocks = _.uniq(questions.map(question => question.getParent()));
+    const blocks = _.uniq(questions.map(question => question.getParent()));
 
-    var relatedLearning = createRelatedLearningList(blocks);
-    var unavailableRelatedLearning = getUnavailableRelatedLearningList(relatedLearning);
+    const relatedLearning = createRelatedLearningList(blocks);
+    const unavailableRelatedLearning = getUnavailableRelatedLearningList(relatedLearning);
 
     checkContentStatusSetting(unavailableRelatedLearning, true);
   }
@@ -95,7 +94,7 @@ define([
    * @return {object}
    */
   function createRelatedLearningList(blocks) {
-    var relatedLearning = {};
+    const relatedLearning = {};
     blocks.forEach(block => {
       getRelatedLearningFromBlock(block, relatedLearning);
     });
@@ -103,7 +102,7 @@ define([
   }
 
   function getRelatedLearningFromBlock(block, relatedLearning) {
-    var config = block.get('_adaptiveContent');
+    const config = block.get('_adaptiveContent');
     if (!config || !config._relatedTopics || config._relatedTopics.length < 1) return relatedLearning;
 
     config._relatedTopics.forEach(id => {
@@ -163,8 +162,8 @@ define([
 
     const finalAssessmentPageID = finalAssessment.getState().pageId;
 
-    if (Adapt.course.get('_adaptiveContent')._setPageStatusAs === "unavailable") {
-      setAsUnavailable([finalAssessmentPageID], saveChanges);
+    if (Adapt.course.get('_adaptiveContent')._setPageStatusAs === 'unavailable') {
+      checkContentStatusSetting([finalAssessmentPageID], saveChanges);
     };
 
     Adapt.config.get('_completionCriteria')._requireAssessmentCompleted = false;
@@ -181,64 +180,32 @@ define([
     Adapt.offlineStorage.set('score', assessmentState.score, 0, assessmentState.maxScore);
   }
 
-  function checkContentStatusSetting(arg, boolean) {
+  function checkContentStatusSetting(ids, saveChanges) {
+    if (!ids || ids.length === 0) return;
     const statusOption = Adapt.course.get('_adaptiveContent')._setPageStatusAs;
-    switch (statusOption) {
-      case 'unavailable':
-        setAsUnavailable(arg, boolean);
-        break;
-      case 'optional':
-        setAsOptional(arg, boolean);
-        break;
-      case 'complete':
-        setAsComplete(arg, boolean);
-        break;
-    }
-  }
-
-  function setAsOptional(ids, saveChanges = false) {
-    if (!ids || ids.length === 0) return;
-    console.log('setAsOptional', ids, saveChanges);
+    const logName = `setAs${statusOption[0].toUpperCase()}${statusOption.substring(1)}`;
+    console.log(logName, ids, saveChanges);
     ids.forEach(id => {
-      var model = Adapt.findById(id);
+      const model = Adapt.findById(id);
       if (!model) return;
-
-      model.setOnChildren('_isOptional', true);
-
-      // Sets all affected content with a new class
-      model.set('_classes', model.get('_classes') + " diag-optional");
+      switch (statusOption) {
+        case 'unavailable':
+          model.setOnChildren('_isAvailable', false);
+          break;
+        case 'optional':
+          model.setOnChildren('_isOptional', true);
+          model.set('_classes', model.get('_classes') + ' diag-optional');
+          break;
+        case 'complete':
+          model.setOnChildren({
+            _isLocked: false,
+            _isComplete: true,
+            _isInteractionComplete: true
+          });
+          model.set('_classes', model.get('_classes') + ' diag-complete');
+          break;
+      }
     });
-
-    if (saveChanges) saveToOfflineStorage(ids);
-  }
-
-  function setAsComplete(ids, saveChanges = false) {
-    if (!ids || ids.length === 0) return;
-    console.log('setAsComplete', ids, saveChanges);
-    ids.forEach(id => {
-      var model = Adapt.findById(id);
-      if (!model) return;
-
-      model.setOnChildren('_isLocked', false);
-      model.setOnChildren('_isComplete', true);
-
-      // Sets all affected content with a new class
-      model.set('_classes', model.get('_classes') + " diag-complete");
-    });
-
-    if (saveChanges) saveToOfflineStorage(ids);
-  }
-
-  function setAsUnavailable(ids, saveChanges = false) {
-    if (!ids || ids.length === 0) return;
-    console.log('setAsUnavailable', ids, saveChanges);
-    ids.forEach(id => {
-      var model = Adapt.findById(id);
-      if (!model) return;
-
-      model.setOnChildren('_isAvailable', false);
-    });
-
     if (saveChanges) saveToOfflineStorage(ids);
   }
 
