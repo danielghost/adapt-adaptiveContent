@@ -1,3 +1,5 @@
+## UPDATE: a new version of this plugin has been developed and will appear here soon.
+
 # Adaptive content extension
 
 ## Overview
