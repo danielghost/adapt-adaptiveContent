@@ -1,13 +1,13 @@
-## UPDATE: a new version of this plugin has been developed and will appear here soon.
-
 # Adaptive content extension
 
 ## Overview
 The purpose of this extension is to allow the content of the course to be tailored to the learner's knowledge of the subject matter.
 
-This is achieved by requiring the learner to sit an up-front assessment - referred to as the 'diagnostic assessment' so as to differentiate it from the final assessment (where used) - successfully answering questions in this assessment causes content to be removed from the learner journey.
+This can be achieved by asking the learner to sit an up-front assessment - referred to as the 'diagnostic assessment' so as to differentiate it from the final assessment (where used) - successfully answering questions in this assessment causes content to be removed or made optional.
 
-Additionally, if the course contains a final assessment, the learner will not be required to sit it if they pass the diagnostic assessment.
+A feature can be configured for learners to opt out of the diagnostic. Providing this option can be useful for new joiners or learners who perhaps do not feel confident and wish to sit the full course.
+
+If the course contains a final assessment, the learner will not be required to sit it if they pass the diagnostic assessment.
 
 It is therefore possible for a learner who gets a perfect score in the diagnostic assessment to 'test out' of all the content, with nothing further to do. Equally it is possible to include _mandatory content_ in the course, which all learners must complete - even those who get a perfect score in the diagnostic assessment.
 
@@ -32,9 +32,9 @@ Or, if you want more than one content object to be associated to the question(s)
 ```
 You can link a content object to multiple blocks of questions. This allows you to use both 'question randomisation' and 'question banking' in the diagnostic assessment - just like you can in a regular assessment.
 
-If the user correctly answers completes all questions associated with a particular content object, that content object will be removed from the learner journey by setting `_isAvailable` to `false`.
+If the user correctly answers all questions associated with a particular content object, that content object will either be removed from the learner journey (by setting `_isAvailable` to `false`) or become optional (`_isOptional` is set to `true`).
 
-If a content object is not associated with any of the questions in the diagnostic assessment, it will be considered _mandatory content_ i.e. all users will need to complete it to complete the course, regardless of how well they perform in the diagnostic assessment
+If a content object is not associated with any of the questions in the diagnostic assessment, it will be considered _mandatory content_ i.e. all users will need to complete it to complete the course, regardless of how well they perform in the diagnostic assessment.
 
 The main configuration for this extension is in `course.json`:
 ```
@@ -42,12 +42,21 @@ The main configuration for this extension is in `course.json`:
     "_isEnabled": true,
     "_shouldSubmitScore": true,
     "_diagnosticAssessmentId": "diagnostic",
-    "_finalAssessmentId": "final"
+    "_finalAssessmentId": "final",
+    "_passedRelatedTopicsBecome": "optional|unavailable",
+    _diagnosticChoice: {
+        _onOptInNavigateTo: null,
+        _onOptOutNavigateTo: null
+    }
 }
 ```
 If `_shouldSubmitScore` is set to `true`, the score the learner attains in the diagnostic assessment will be reported to the LMS. Note that, if the course contains a final assessment, and the learner is required to complete that, the score for the final assessment will overwrite any score recording from their attempt at the diagnostic assessment. This is because SCORM only allows for one score per SCO to be recorded.
 
 The setting `_diagnosticAssessmentId` is the 'assessment ID' of the diagnostic assessment. This setting is mandatory. If the course includes a final assessment, you must set `_finalAssessmentId` to the 'assessment ID' of the final assessment. These settings are vital to allow the extension to know which assessment is which!
+
+When all diagnostic questions associated with a topic are answered correctly that topic can either be removed from the learner journey or made optional. Set `_passedRelatedTopicsBecome` to `unavailable` or `optional` to determine this behaviour respectively.
+
+If the user is allowed to opt out of the diagnostic then a single `diagnosticChoice` component should be defined and presented upfront. Appropriate labelling should be defined in `course.json` by `_globals._components._diagnosticChoice` (see `example.json`). Once the selection to opt in or opt out has been made the user can optionally be routed to a particular part of the course. Use the `_diagnosticChoice` property in the global `_adaptiveContent` configuration to define the routes.
 
 ## Learner Journey Scenarios
 
@@ -57,6 +66,7 @@ The following scenarios are all supported by this extension
 
 |Diagnostic Assessment Result|Learner Journey Outcome|
 |------|------|
+|Opt out|All content objects must be completed|
 |Fail|All content objects related to failed blocks must be completed|
 |Pass|All content objects related to failed blocks must be completed|
 |Perfect|Course marked as complete|
@@ -65,6 +75,7 @@ The following scenarios are all supported by this extension
 
 |Diagnostic Assessment Result|Learner Journey Outcome|
 |------|------|
+|Opt out|All content objects must be completed|
 |Fail|All content objects related to failed blocks & mandatory content must be completed|
 |Pass|All content objects related to failed blocks & mandatory content must be completed|
 |Perfect|All mandatory content must be completed|
@@ -73,6 +84,7 @@ The following scenarios are all supported by this extension
 
 |Diagnostic Assessment Result|Learner Journey Outcome|
 |------|------|
+|Opt out|All content objects & final assessment must be completed|
 |Fail|All content objects related to failed blocks & final assessment must be completed|
 |Pass|Final assessment disabled. All content objects related to failed blocks must be completed.|
 |Perfect|Final assessment disabled. Course marked as complete.|
@@ -81,6 +93,7 @@ The following scenarios are all supported by this extension
 
 |Diagnostic Assessment Result|Learner Journey Outcome|
 |------|------|
+|Opt out|All content objects & final assessment must be completed|
 |Fail|All content objects related to failed blocks, mandatory content & final assessment must be completed|
 |Pass|Final assessment disabled. All content objects related to failed blocks & mandatory content must be completed.|
 |Perfect|Final assessment disabled. All mandatory content must be completed.|

@@ -1,49 +1,83 @@
-define([
-  'core/js/adapt'
-], function(Adapt) {
+
+import Backbone from 'backbone';
+import Adapt from 'core/js/adapt';
+import components from 'core/js/components';
+import data from 'core/js/data';
+import offlineStorage from 'core/js/offlineStorage';
+import router from 'core/js/router';
+import DiagnosticChoiceModel from './DiagnosticChoiceModel';
+import DiagnosticChoiceView from './DiagnosticChoiceView';
+
+class AdaptiveContent extends Backbone.Model {
+
+  defaults() {
+    return {
+      _isEnabled: false,
+      _shouldSubmitScore: true,
+      _diagnosticAssessmentId: 'diagnostic',
+      _finalAssessmentId: 'final',
+      _passedRelatedTopicsBecome: 'unavailable',
+      _diagnosticOptOut: null,
+      _diagnosticChoice: {
+        _onOptInNavigateTo: null,
+        _onOptOutNavigateTo: null
+      }
+    };
+  };
+
+  initialize() {
+    this.set({
+      optional: [],
+      unavailable: []
+    });
+
+    this.listenTo(Adapt, {
+      'adapt:start': this.onAdaptStart
+    });
+  }
 
   // TODO need to check this with the language picker to see if it needs any additional work to reset on language change
-  Adapt.on('adapt:start', function initAdaptiveContentPlugin() {
-    const courseConfig = Adapt.course.get('_adaptiveContent');
-    if (!courseConfig || !courseConfig._isEnabled) return;
+  onAdaptStart() {
+    this.set($.extend(true, this.defaults(), Adapt.course.get('_adaptiveContent')));
+
+    if (!this.get('_isEnabled')) return;
 
     // check for stored data from a previous attempt
-    const adaptiveContent = Adapt.offlineStorage.get('adaptiveContent');
-    if (!adaptiveContent) {
+    const persistedData = offlineStorage.get('adaptiveContent');
+    if (!persistedData) {
       // no previous attempt, wait for the learner to complete the diagnostic assessment
-      Adapt.on('assessments:complete', onDiagnosticAssessmentComplete);
+      this.listenTo(Adapt, 'assessments:complete', this.onDiagnosticAssessmentComplete);
       return;
     }
 
     // restore from suspend data
-    setAsUnavailable(adaptiveContent, false);
+    this.restoreAdaptiveContent(persistedData);
 
-    if (!courseConfig._finalAssessmentId) return;
+    if (!this.get('_finalAssessmentId')) return;
 
     // course contains a final assessment, need to check if that needs to be handled or not
-    const assessment = Adapt.assessment._assessments._byAssessmentId[courseConfig._finalAssessmentId];
+    const assessment = Adapt.assessment._assessments._byAssessmentId[this.get('_finalAssessmentId')];
     const assessmentContentObject = Adapt.findById(assessment.getState().pageId);
     if (assessmentContentObject.get('_isAvailable')) return;
 
-    hideFinalAssessment(courseConfig._finalAssessmentId, false);
-  });
+    this.hideFinalAssessment(this.get('_finalAssessmentId'));
+  }
 
-  function onDiagnosticAssessmentComplete(state) {
+  onDiagnosticAssessmentComplete(state) {
     console.log('onAssessmentComplete', state.isPass);
-    const config = Adapt.course.get('_adaptiveContent');
 
-    if (state.id !== config._diagnosticAssessmentId) return;
+    if (state.id !== this.get('_diagnosticAssessmentId')) return;
 
-    checkQuestions(state.questionModels);
+    this.checkQuestions(state.questionModels);
 
     if (!state.isPass) {
       Adapt.trigger('diagnostic:complete', state);
       return;
     }
 
-    hideFinalAssessment(config._finalAssessmentId, true);
+    this.hideFinalAssessment(this.get('_finalAssessmentId'));
 
-    submitDiagnosticAssessmentScore(state);
+    this.submitDiagnosticAssessmentScore(state);
 
     Adapt.trigger('diagnostic:complete', state);
 
@@ -59,13 +93,18 @@ define([
    * Then check that list to see if all questions associated with it were answered correctly
    * @param {Backbone.Collection} questions Collection of questionModels
    */
-  function checkQuestions(questions) {
+  checkQuestions(questions) {
     // first, get a list of blocks (removing duplicates - blocks may have more than one question)
-    var blocks = _.uniq(questions.map(question => question.getParent()));
+    const blocks = _.uniq(questions.map(question => question.getParent()));
 
-    var relatedLearning = createRelatedLearningList(blocks);
-    var unavailableRelatedLearning = getUnavailableRelatedLearningList(relatedLearning);
-    setAsUnavailable(unavailableRelatedLearning, true);
+    const relatedLearning = this.createRelatedLearningList(blocks);
+    const passedRelatedLearningIds = this.getPassedRelatedLearningList(relatedLearning);
+    const passedRelatedLearningModels = passedRelatedLearningIds.map(id => data.findById(id));
+
+    switch (this.get('_passedRelatedTopicsBecome')) {
+      case 'optional': return passedRelatedLearningModels.forEach(model => this.addToOptional(model));
+      case 'unavailable': return passedRelatedLearningModels.forEach(model => this.addToUnavailable(model));
+    }
   }
 
   /**
@@ -91,41 +130,41 @@ define([
    * @param {Array.<Backbone.Model>} blocks
    * @return {object}
    */
-  function createRelatedLearningList(blocks) {
-    var relatedLearning = {};
+  createRelatedLearningList(blocks) {
+    const relatedLearning = {};
     blocks.forEach(block => {
-      getRelatedLearningFromBlock(block, relatedLearning);
+      this.getRelatedLearningFromBlock(block, relatedLearning);
     });
     return relatedLearning;
   }
 
-  function getRelatedLearningFromBlock(block, relatedLearning) {
-    var config = block.get('_adaptiveContent');
-    if (!config || !config._relatedTopics || config._relatedTopics.length < 1) return relatedLearning;
+  getRelatedLearningFromBlock(block, relatedLearning) {
+    const blockConfig = block.get('_adaptiveContent');
 
-    config._relatedTopics.forEach(id => {
+    if (_.isEmpty(blockConfig?._relatedTopics)) return relatedLearning;
+
+    blockConfig._relatedTopics.forEach(id => {
       if (!relatedLearning[id]) relatedLearning[id] = [];
       relatedLearning[id].push(block);
     });
   }
 
   /**
-   * Creates a list of 'related learning to make unavaialable' by going through the related learning list
-   * checking to see if every question associated with it was answered correctly. If so, it's added to the list.
+   * Returns a list of all topics for which all associated questions were answered correctly.
    * @param {object} relatedLearning
    * @return {Array.<string>} An array of content object ids
    */
-  function getUnavailableRelatedLearningList(relatedLearning) {
-    const unavailableList = [];
+  getPassedRelatedLearningList(relatedLearning) {
+    const list = [];
     _.each(relatedLearning, (blocks, contentObjectId) => {
-      const allCorrect = blocks.every(block => areAllComponentsCorrect(block));
-      if (allCorrect) unavailableList.push(contentObjectId);
+      const allCorrect = blocks.every(block => this.areAllComponentsCorrect(block));
+      if (allCorrect) list.push(contentObjectId);
     });
 
-    return unavailableList;
+    return list;
   }
 
-  function areAllComponentsCorrect(block) {
+  areAllComponentsCorrect(block) {
     if (block.has('_allComponentsCorrect')) { // if we've checked this block before, used the cached result to save time
       return block.get('_allComponentsCorrect');
     }
@@ -148,8 +187,8 @@ define([
     return allCorrect;
   }
 
-  function hideFinalAssessment(finalAssessmentId, saveChanges) {
-    console.log('hideFinalAssessment', finalAssessmentId, saveChanges);
+  hideFinalAssessment(finalAssessmentId) {
+    console.log('hideFinalAssessment', finalAssessmentId);
     if (!finalAssessmentId) return;
 
     const finalAssessment = Adapt.assessment._assessments._byAssessmentId[finalAssessmentId];
@@ -158,45 +197,107 @@ define([
       return;
     }
 
-    const finalAssessmentPageID = finalAssessment.getState().pageId;
-    setAsUnavailable([finalAssessmentPageID], saveChanges);
+    const finalAssessmentPage = data.findById(finalAssessment.getState().pageId);
+    this.addToUnavailable(finalAssessmentPage);
 
     Adapt.config.get('_completionCriteria')._requireAssessmentCompleted = false;
   }
 
-  function submitDiagnosticAssessmentScore(assessmentState) {
-    if (!Adapt.course.get('_adaptiveContent')._shouldSubmitScore) return;
+  submitDiagnosticAssessmentScore(assessmentState) {
+    if (!this.get('_shouldSubmitScore')) return;
 
     if (assessmentState.isPercentageBased) {
-      Adapt.offlineStorage.set('score', assessmentState.scoreAsPercent, 0, 100);
+      offlineStorage.set('score', assessmentState.scoreAsPercent, 0, 100);
       return;
     }
 
-    Adapt.offlineStorage.set('score', assessmentState.score, 0, assessmentState.maxScore);
+    offlineStorage.set('score', assessmentState.score, 0, assessmentState.maxScore);
   }
 
-  function setAsUnavailable(ids, saveChanges = false) {
-    if (!ids || ids.length === 0) return;
-    console.log('setAsUnavailable', ids, saveChanges);
-    ids.forEach(id => {
-      var model = Adapt.findById(id);
-      if (!model) return;
+  restoreAdaptiveContent(persistedData) {
+    this.set({
+      optional: [],
+      unavailable: [],
+      ...persistedData
+    });
 
+    this.get('optional').forEach(id => {
+      const model = data.findById(id);
+      model.setOnChildren('_isOptional', true);
+    });
+
+    this.get('unavailable').forEach(id => {
+      const model = data.findById(id);
       model.setOnChildren('_isAvailable', false);
     });
-
-    if (saveChanges) saveToOfflineStorage(ids);
   }
 
-  function saveToOfflineStorage(contentObjectIds) {
-    const adaptiveContent = Adapt.offlineStorage.get('adaptiveContent') || [];
-    contentObjectIds.forEach(id => {
-      if (adaptiveContent.includes(id)) return;
-      adaptiveContent.push(id);
-    });
-
-    console.log('saveToOfflineStorage', adaptiveContent);
-    Adapt.offlineStorage.set('adaptiveContent', adaptiveContent);
-    Adapt.offlineStorage.save();
+  addToOptional(model) {
+    const id = model.get('_id');
+    const optional = this.get('optional');
+    model.setOnChildren('_isOptional', true);
+    if (optional.indexOf(id) >= 0) return;
+    this.set('optional', optional.concat(id));
+    this.persist();
   }
+
+  addToUnavailable(model) {
+    const id = model.get('_id');
+    const unavailable = this.get('unavailable');
+    model.setOnChildren('_isAvailable', false);
+    if (unavailable.indexOf(id) >= 0) return;
+    this.set('unavailable', unavailable.concat(id));
+    this.persist();
+  }
+
+  diagnosticOptIn() {
+    const diagnostic = Adapt.assessment.get(this.get('_diagnosticAssessmentId'));
+
+    this.set('_diagnosticOptOut', false);
+    diagnostic.setOnChildren('_isAvailable', true);
+
+    this.optInNavigation();
+  }
+
+  diagnosticOptOut() {
+    const diagnostic = Adapt.assessment.get(this.get('_diagnosticAssessmentId'));
+    const diagnosticPage = diagnostic.getParent();
+
+    this.set('_diagnosticOptOut', true);
+    diagnosticPage.setOnChildren('_isAvailable', false);
+
+    this.optOutNavigation();
+  }
+
+  optInNavigation() {
+    const diagnosticChoiceCfg = this.get('_diagnosticChoice');
+
+    if (diagnosticChoiceCfg._onOptInNavigateTo) {
+      router.navigateToElement(diagnosticChoiceCfg._onOptInNavigateTo);
+    }
+  }
+
+  optOutNavigation() {
+    const diagnosticChoiceCfg = this.get('_diagnosticChoice');
+
+    if (diagnosticChoiceCfg._onOptOutNavigateTo) {
+      router.navigateToElement(diagnosticChoiceCfg._onOptOutNavigateTo);
+    }
+  }
+
+  persist() {
+    const optional = this.get('optional');
+    const unavailable = this.get('unavailable');
+
+    offlineStorage.set('adaptiveContent', { optional, unavailable });
+    offlineStorage.save();
+  }
+
+}
+
+components.register('diagnosticChoice', {
+  model: DiagnosticChoiceModel,
+  view: DiagnosticChoiceView
 });
+
+export default (Adapt.adaptiveContent = new AdaptiveContent());

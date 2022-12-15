@@ -1,15 +1,47 @@
 // to be added to course.json:
 "_adaptiveContent": {
-    "_isEnabled": true,
-    "_shouldSubmitScore": true,
-    "_diagnosticAssessmentId": "diagnostic",
-    "_finalAssessmentId": "final"
+  "_isEnabled": true,
+  "_shouldSubmitScore": true,
+  "_diagnosticAssessmentId": "diagnostic",
+  "_finalAssessmentId": "final",
+  "_passedRelatedTopicsBecome": "optional|unavailable",
+  _diagnosticChoice: {
+    _onOptInNavigateTo: null,
+    _onOptOutNavigateTo: null
+  }
 }
-
+// _globals._components._diagnosticChoice
+"diagnosticChoice": {
+  "_buttons": {
+    "_optIn": {
+      "label": "Opt In"
+    },
+    "_optOut": {
+      "label": "Opt Out"
+    },
+    "_optInNavigation": {
+      "label": "Go to diagnostic"
+    },
+    "_optOutNavigation": {
+      "label": "Go to menu"
+    }
+  }
+}
 // to be added to blocks in the 'diagnostic assessment':
 "_adaptiveContent": {
-    "_relatedTopics": [
-        "co-05",
-        "co-10"
-    ]
+  "_relatedTopics": [
+    "co-05",
+    "co-10"
+  ]
+}
+
+// components.json (optional)
+{
+  "_id": "c-00",
+  "_parentId": "b-00",
+  "_type": "component",
+  "_component": "diagnosticChoice",
+  "_classes": "",
+  "_layout": "full",
+  "title": "c-00"
 }
