@@ -1,4 +1,15 @@
-## UPDATE: a new version of this plugin has been developed and will appear here soon.
+## UPDATE: see the [develop branch](https://github.com/cgkineo/adapt-adaptiveContent/tree/develop) for a new version of this plugin.
+
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
 
 # Adaptive content extension
 
